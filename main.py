@@ -1,4 +1,5 @@
 import json
+import os.path
 import re
 import time
 
@@ -17,6 +18,10 @@ import datetime
 
 annotator = errant.load('en')
 
+PATH = os.path.abspath('models/gf.pth')
+
+
+
 print("Loading models...")
 
 app = FastAPI()
@@ -27,7 +32,7 @@ class Sentences(BaseModel):
 
 
 origins = [
-
+    'https://8249-218-2-231-114.jp.ngrok.io/',
     "http://localhost",
     "http://localhost:3000",
     "http://127.0.0.1:8000",
@@ -35,10 +40,11 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+
 )
 
 device = "cpu"
@@ -61,7 +67,12 @@ print("Models loaded !")
 
 gf = Gramformer(models=1, use_gpu=False)  # 1=corrector, 2=detector
 
+try:
+    torch.save(gf, PATH)
 
+    gf_inference = torch.load(PATH)
+except:
+    print('Torch Save Error')
 @app.get("/")
 def read_root():
     return {"Gramformer !"}
@@ -197,23 +208,23 @@ def highlight(orig, cor):
                 edit_spos += 1
 
             if edit_type == "PUNCT":
-                timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-')
+                timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-') + edit_type
 
                 st = "<a id=" + timestamp + " " + "type='" + edit_type + "' edit='" + \
                      edit_str_end + "'>" + new_edit_str + "</a>"
             else:
-                timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-')
+                timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-') + edit_type
 
                 st = "<a id=" + timestamp + " " + "type='" + edit_type + "' edit='" + new_edit_str + \
                      " " + edit_str_end + "'>" + new_edit_str + "</a>"
             orig_tokens[edit_spos] = st
         elif edit_str_end == "":
-            timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-')
+            timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-') + edit_type
 
             st = "<d id=" + timestamp + " " + "type='" + edit_type + "' edit=''>" + edit_str_start + "</d>"
             orig_tokens[edit_spos] = st
         else:
-            timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-')
+            timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-') + edit_type
 
             st = "<span id=" + timestamp + " " + "type='" + edit_type + "' edit='" + \
                  edit_str_end + "'>" + edit_str_start + "</span>"
