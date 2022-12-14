@@ -20,8 +20,6 @@ annotator = errant.load('en')
 
 PATH = os.path.abspath('models/gf.pth')
 
-
-
 print("Loading models...")
 
 app = FastAPI()
@@ -73,6 +71,8 @@ try:
     gf_inference = torch.load(PATH)
 except:
     print('Torch Save Error')
+
+
 @app.get("/")
 def read_root():
     return {"Gramformer !"}
@@ -94,7 +94,6 @@ def get_corrected_sentence(sentences: Sentences):
     sent_list = list(scored_corrected_sentence)
 
     highlighted_sentences = show_highlights(sentence_list[0], sent_list[0])
-    # print(highlighted_sentences)
 
     return json.dumps({'corrected_sentence': highlighted_sentences})
 
@@ -141,7 +140,6 @@ def show_highlights(input_text, corrected_sentence):
     try:
         strikeout = lambda x: '\u0336'.join(x) + '\u0336'
         highlight_text = highlight(input_text, corrected_sentence)
-        print(highlight_text)
         color_map = {'d': '#faa', 'a': '#afa', 'span': '#fea'}
         tokens = re.split(r'(<[das]\s.*?<\/[das]>)', highlight_text)
         # print(tokens)
@@ -154,15 +152,18 @@ def show_highlights(input_text, corrected_sentence):
                 _tag = tags[0].name
                 _type = tags[0]['type']
                 _text = tags[0]['edit']
+                _desc = tags[0]['desc']
                 _color = color_map[_tag]
 
                 if _tag == 'd':
                     _text = strikeout(tags[0].text)
 
-                annotations.append((_text, _type, _color))
+                annotations.append((_text, _type, _desc))
             else:
                 annotations.append(token)
         annotated_text(*annotations)
+
+        print(highlight_text)
 
         return highlight_text
 
@@ -179,6 +180,35 @@ def show_edits(input_text, corrected_sentence):
 
     except Exception as e:
         print('Some error occured!' + str(e))
+
+
+def description(orig, edit, edit_type):
+
+    descriptions = {
+        "DET": 'The article %s may be incorrect. You may consider changing it to agree with the beginning sound of the following word and use %s' % (
+            orig, edit),
+        "NOUN": 'Consider changing %s to %s' % (
+            orig, edit),
+        "SPELL": 'The word %s is wrongly spelt. Correct it to %s' % (
+            orig, edit),
+        "PUNCT": 'The article %s may be incorrect. You may consider changing it to agree with the beginning sound of the following word and use %s' % (
+            orig, edit),
+        "OTHER": 'Consider changing %s to %s' % (
+            orig, edit),
+        "ORTH": '%s may be incorrect. Consider changing to %s' % (
+            orig, edit),
+        "VERB:FORM": 'The verb %s may be incorrect.  Consider changing to %s' % (
+            orig, edit),
+        "NOUN:NUM": '%s may not agree in number with other words in this phrase. Consider changing to %s' % (
+            orig, edit),
+        "VERB:TENSE": 'The verb tense %s may be incorrect. Consider changing to %s' % (
+            orig, edit),
+        "VERB:SVA": 'The verb %s may be incorrect. Consider changing to %s' % (
+            orig, edit),
+
+    }
+    desc = descriptions[edit_type]
+    return desc
 
 
 def highlight(orig, cor):
@@ -226,12 +256,17 @@ def highlight(orig, cor):
         else:
             timestamp = str(datetime.datetime.timestamp(datetime.datetime.now())).replace('.', '-') + edit_type
 
-            st = "<span id=" + timestamp + " " + "type='" + edit_type + "' edit='" + \
-                 edit_str_end + "'>" + edit_str_start + "</span>"
+            edit_desc = description(edit_str_start, edit_str_end, edit_type)
+
+            st = "<span id=" + timestamp + " type='" + edit_type + "' desc='" + edit_desc + "' edit='" + \
+                 str(edit_str_end) + "'>" + edit_str_start + "</span>"
+
             orig_tokens[edit_spos] = st
 
     for i in sorted(ignore_indexes, reverse=True):
+        print(i)
         del (orig_tokens[i])
+
     return (" ".join(orig_tokens))
 
 
